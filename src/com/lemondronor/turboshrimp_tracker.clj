@@ -173,6 +173,19 @@
       (.drawRect g x1 y1 w h))))
 
 
+(defn draw-tracker
+  "Draws the tracking box."
+  [^JPanel view ^Graphics2D g tracker]
+  (if-let [tracked (:tracked tracker)]
+    (do
+      (println "DRAWING TRACKER" tracked)
+      (.setColor g Color/RED)
+      (let [x (int-array (map first tracked))
+            y (int-array (map second tracked))]
+        (.drawPolyline g x y 4)))
+    (println "SKIPPING TRACKER")))
+
+
 (defn draw-frame
   "Draws a video frame."
   [^JPanel view ^Graphics g ^BufferedImage image]
@@ -232,6 +245,8 @@
            (draw-frame view gbi video-frame)
            (draw-hud view gbi (:drone model))
            (draw-selection view gbi (:selection model))
+           (println "WOO" model)
+           (draw-tracker view gbi (:tracker model))
            (.drawImage g bi 0 0 nil)))))))
 
 
@@ -244,7 +259,7 @@
           xf (/ iw cw)
           yf (/ ih cw)
           [[x1 y1] [x2 y2]] roi]
-      [[(* x1 xf) (* y1 yf)] [(* x2 xf) (* y2 yf)]])
+      [[(int (* x1 xf)) (int (* y1 yf))] [(int (* x2 xf)) (int (* y2 yf))]])
     roi))
 
 
@@ -271,7 +286,7 @@
         (swap!
          model
          (fn [m]
-           (println "UPDATING TRACKER model=" m)
+           (println "STARTING TRACKER model=" m)
            (if-let [cur (:cur (:selection m))]
              (let [[x1 y1] (:origin (:selection m))
                    [x2 y2] cur
@@ -297,12 +312,13 @@
 
 
 (defn update-tracker [model]
-  (println "TRACKER" (:tracker model))
   (if-let [tracker (:tracker model)]
     (let [m (assoc
              model :tracker
              (vision/update-tracker tracker (:video-frame model)))]
-      (println "NEW TRACKER" (:tracker m))
+      (println "UPDATED TRACKER" (:tracker m))
+      (println (-> m :tracker :roi))
+      (println (-> m :tracker :tracked))
       m)
     model))
 
@@ -324,7 +340,7 @@
       (seesaw/listen vid :mouse-motion mc))
     (add-watch model :render-view (fn [k r o n] (view n)))
     (add-sub-watch
-     model [:video-frame] :tracker (fn [k r o n] (update-tracker n)))
+     model [:video-frame] :tracker (fn [k r o n] (swap! r update-tracker)))
     (start-video-controller model)
     (ar-drone/connect! drone)
     (ar-drone/command drone :navdata-options commands/default-navdata-options)))

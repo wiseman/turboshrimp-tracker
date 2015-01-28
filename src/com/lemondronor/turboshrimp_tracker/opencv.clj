@@ -25,8 +25,8 @@
 
 
 (defn bounds->rect [bounds]
-  (let [[[x1 y1] [x2 y2]] bounds]
-    (Rect. x1 y2 x2 y2)))
+  (let [[[x1 y1] [w h]] bounds]
+    (Rect. x1 y1 w h)))
 
 
 (defn point->coords [^Point point]
@@ -34,7 +34,7 @@
 
 
 (defn rect->bounds [^Rect rect]
-  [(point->coords (.tl rect)) (point->coords (.br rect))])
+  [[(. rect x) (. rect y)] [(. rect width) (. rect height)]])
 
 
 (defn img->mat [^BufferedImage img]
@@ -89,6 +89,7 @@
             (+ TermCriteria/COUNT TermCriteria/EPS) 80 1.0))
           points (make-array Point 4)]
       (.points rot-rect points)
+      (println "WOO" rot-rect (.boundingRect rot-rect))
       (assoc
        tracker
        :roi (rect->bounds (.boundingRect rot-rect))
