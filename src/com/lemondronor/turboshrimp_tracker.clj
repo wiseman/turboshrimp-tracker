@@ -1,5 +1,6 @@
 (ns com.lemondronor.turboshrimp-tracker
-  (:require [clojure.java.io :as io]
+  (:require [clojure.core.incubator :as incu]
+            [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [com.lemondronor.turboshrimp :as ar-drone]
             [com.lemondronor.turboshrimp.at :as commands]
@@ -8,7 +9,7 @@
             [com.lemondronor.turboshrimp-tracker.opencv :as vision]
             [seesaw.core :as seesaw])
   (:import [java.awt.event InputEvent KeyEvent MouseEvent]
-           [java.awt Color Font Graphics Graphics2D]
+           [java.awt Color Component Font Graphics Graphics2D]
            [java.awt.image BufferedImage]
            [java.net Socket]
            [javax.swing JPanel])
@@ -160,22 +161,16 @@
         (.rotate g (deg2rad roll) (/ w 2.0) h2)))))
 
 
-(defn draw-selection [^JPanel view ^Graphics2D g selection]
-  (cond
-    (:end selection)
-    (let [x (-> selection :origin :x)
-          y (-> selection :origin :y)
-          w (- (-> selection :end :x) x)
-          h (- (-> selection :end :y) y)]
+(defn draw-selection
+  "Draws a selection marquee on the view."
+  [^JPanel view ^Graphics2D g selection]
+  (when (and (:origin selection) (:cur selection))
+    (let [[x1 y1] (:origin selection)
+          [x2 y2] (:cur selection)
+          w (- x2 x1)
+          h (- y2 y1)]
       (.setColor g Color/WHITE)
-      (.drawRect g x y w h))
-    (:cur selection)
-    (let [x (-> selection :origin :x)
-          y (-> selection :origin :y)
-          w (- (-> selection :cur :x) x)
-          h (- (-> selection :cur :y) y)]
-      (.setColor g Color/RED)
-      (.drawRect g x y w h))))
+      (.drawRect g x1 y1 w h))))
 
 
 (defn draw-frame
@@ -188,7 +183,11 @@
   (.getInputStream (Socket. (:hostname drone) ar-drone/default-video-port)))
 
 
-(defn start-video-controller [model]
+(defn start-video-controller
+  "Starts two threads: One reads video data from the drone, the other
+  decodes it.  We keep these two processes asynchronous so we can drop
+  frames if our decoding is too slow."
+  [model]
   (let [fq (pave/make-frame-queue)]
     {:frame-reader
      (doto
@@ -219,7 +218,6 @@
 (defn make-view [ui]
   (let [^JPanel view (seesaw/select ui [:#video])]
     (fn render-model [model]
-      (println "WHOA" model)
       (let [g (.getGraphics view)
             bi (BufferedImage.
                 (.getWidth view)
@@ -229,6 +227,7 @@
             video-frame (:video-frame model)]
         (draw-hud view gbi (:drone model))
         (when video-frame
+          (vision/write video-frame)
           (seesaw/invoke-now
            (draw-frame view gbi video-frame)
            (draw-hud view gbi (:drone model))
@@ -236,24 +235,83 @@
            (.drawImage g bi 0 0 nil)))))))
 
 
-(defn mouse-controller [model]
+(defn xform-roi [roi ^Component component ^BufferedImage video-frame]
+  (if (and component video-frame)
+    (let [cw (.getWidth component)
+          ch (.getHeight component)
+          iw (.getWidth video-frame)
+          ih (.getHeight video-frame)
+          xf (/ iw cw)
+          yf (/ ih cw)
+          [[x1 y1] [x2 y2]] roi]
+      [[(* x1 xf) (* y1 yf)] [(* x2 xf) (* y2 yf)]])
+    roi))
+
+
+(defn mouse-controller
+  "Makes a controller function for mouse events."
+  [model]
   (fn [^MouseEvent e]
     (let [id (.getID e)]
       (cond
+        ;; Begin selection on MOUSE_PRESSED.
         (= id MouseEvent/MOUSE_PRESSED)
-        (swap! model assoc :selection {:origin {:x (.getX e) :y (.getY e)}})
+        (swap!
+         model
+         (fn [m]
+           (-> m
+               (assoc :tracker (vision/stop-tracker (:tracker model)))
+               (assoc :selection {:origin [(.getX e) (.getY e)]}))))
+        ;; Resize selection on MOUSE_DRAGGED.
         (= id MouseEvent/MOUSE_DRAGGED)
-        (swap! model assoc-in [:selection :cur] {:x (.getX e) :y (.getY e)})
+        (swap! model assoc-in [:selection :cur] [(.getX e) (.getY e)])
+        ;; On MOUSE_RELEASED, initialize the video tracker and clear
+        ;; the selection.
         (= id MouseEvent/MOUSE_RELEASED)
-        (swap! model assoc-in [:selection :end] {:x (.getX e) :y (.getY e)})
+        (swap!
+         model
+         (fn [m]
+           (println "UPDATING TRACKER model=" m)
+           (if-let [cur (:cur (:selection m))]
+             (let [[x1 y1] (:origin (:selection m))
+                   [x2 y2] cur
+                   roi [[x1 y1] [(- x2 x1) (- y2 y1)]]]
+               (-> m
+                   (dissoc :selection)
+                   (assoc
+                    :tracker
+                    (vision/start-tracker
+                     (:video-frame m)
+                     (xform-roi roi (.getComponent e) (:video-frame m))))))
+             m)))
         :else nil))))
 
 
+(defn add-sub-watch [ref keys id watch-fn]
+  (add-watch
+   ref
+   id
+   (fn [k r o n]
+     (when (not (= (get-in o keys) (get-in n keys)))
+       (watch-fn k r o n)))))
+
+
+(defn update-tracker [model]
+  (println "TRACKER" (:tracker model))
+  (if-let [tracker (:tracker model)]
+    (let [m (assoc
+             model :tracker
+             (vision/update-tracker tracker (:video-frame model)))]
+      (println "NEW TRACKER" (:tracker m))
+      m)
+    model))
+
+
 (defn -main [& args]
+  (vision/init)
   (let [ui (make-ui)
         drone (ar-drone/make-drone)
         model (atom {:drone drone
-                     :video-tracker (vision/tracker)
                      :video-frame nil
                      :navdata nil
                      :selection nil})
@@ -265,6 +323,8 @@
       (seesaw/listen vid :mouse mc)
       (seesaw/listen vid :mouse-motion mc))
     (add-watch model :render-view (fn [k r o n] (view n)))
+    (add-sub-watch
+     model [:video-frame] :tracker (fn [k r o n] (update-tracker n)))
     (start-video-controller model)
     (ar-drone/connect! drone)
     (ar-drone/command drone :navdata-options commands/default-navdata-options)))
