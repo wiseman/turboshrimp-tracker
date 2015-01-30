@@ -58,8 +58,12 @@
      (Scalar. 180.0 255.0 255.0)
      mask)
     (Imgproc/calcHist
-       [hsv-roi] (mat-of-int 0) mask roi-hist (mat-of-int 180)
-       (mat-of-float 0.0 180.0))
+     [hsv-roi]
+     (mat-of-int 0)
+     mask
+     roi-hist
+     (mat-of-int 180)
+     (mat-of-float 0.0 50.0))
     (Core/normalize roi-hist roi-hist 0 255 Core/NORM_MINMAX)
     roi-hist))
 
@@ -79,7 +83,7 @@
      (mat-of-int 0)
      ^Mat (:roi-hist tracker)
      back-projection
-     (mat-of-float 0.0 180.0)
+     (mat-of-float 0.0 50.0)
      1.0)
     (let [^RotatedRect rot-rect
           (Video/CamShift
