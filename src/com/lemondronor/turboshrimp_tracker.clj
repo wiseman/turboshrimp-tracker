@@ -211,7 +211,7 @@
       (.setColor g Color/RED)
       (let [x (int-array (map first tracked))
             y (int-array (map second tracked))]
-        (.drawPolyline g x y 4)))
+        (.drawPolygon g x y 4)))
     (println "SKIPPING TRACKER")))
 
 

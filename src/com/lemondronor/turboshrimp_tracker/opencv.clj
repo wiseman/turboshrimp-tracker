@@ -54,8 +54,8 @@
     (Imgproc/cvtColor roi hsv-roi Imgproc/COLOR_BGR2HSV)
     (Core/inRange
      hsv-roi
-     (Scalar. 0.0 30.0 32.0)
-     (Scalar. 180.0 255.0 255.0)
+     (Scalar. 0.0 10.0 32.0)
+     (Scalar. 360.0 255.0 255.0)
      mask)
     (Imgproc/calcHist
      [hsv-roi]
@@ -63,7 +63,7 @@
      mask
      roi-hist
      (mat-of-int 180)
-     (mat-of-float 0.0 50.0))
+     (mat-of-float 0.0 250.0))
     (Core/normalize roi-hist roi-hist 0 255 Core/NORM_MINMAX)
     roi-hist))
 
@@ -83,14 +83,14 @@
      (mat-of-int 0)
      ^Mat (:roi-hist tracker)
      back-projection
-     (mat-of-float 0.0 50.0)
+     (mat-of-float 0.0 250.0)
      1.0)
     (let [^RotatedRect rot-rect
           (Video/CamShift
            back-projection
            ^Rect (bounds->rect (:roi tracker))
            (TermCriteria.
-            (+ TermCriteria/COUNT TermCriteria/EPS) 80 1.0))
+            (+ TermCriteria/COUNT TermCriteria/EPS) 10 1.0))
           points (make-array Point 4)]
       (.points rot-rect points)
       (println "WOO" rot-rect (.boundingRect rot-rect))
