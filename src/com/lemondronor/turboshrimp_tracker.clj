@@ -173,12 +173,41 @@
       (.drawRect g x1 y1 w h))))
 
 
+(defn view-point-xformer [^Component component ^BufferedImage video-frame]
+  (if (and component video-frame)
+    (let [cw (.getWidth component)
+          ch (.getHeight component)
+          iw (.getWidth video-frame)
+          ih (.getHeight video-frame)
+          xf (/ iw cw)
+          yf (/ ih ch)]
+      (fn [[x y]]
+        [(* x xf) (* y yf)]))
+    (fn [[x y]]
+      [x y])))
+
+
+(defn inv-view-point-xformer [^Component component ^BufferedImage video-frame]
+  (if (and component video-frame)
+    (let [cw (.getWidth component)
+          ch (.getHeight component)
+          iw (.getWidth video-frame)
+          ih (.getHeight video-frame)
+          xf (/ cw iw)
+          yf (/ ch ih)]
+      (fn [[x y]]
+        [(* x xf) (* y yf)]))
+    (fn [[x y]]
+      [x y])))
+
+
 (defn draw-tracker
   "Draws the tracking box."
-  [^JPanel view ^Graphics2D g tracker]
-  (if-let [tracked (:tracked tracker)]
-    (do
-      (println "DRAWING TRACKER" tracked)
+  [^JPanel view ^Graphics2D g model]
+  (if-let [tracked (:tracked (:tracker model))]
+    (let [tracked (map (inv-view-point-xformer view (:video-frame model))
+                       tracked)]
+      (println "DRAWING TRACKER" (:tracked (:tracker model)))
       (.setColor g Color/RED)
       (let [x (int-array (map first tracked))
             y (int-array (map second tracked))]
@@ -246,21 +275,8 @@
            (draw-hud view gbi (:drone model))
            (draw-selection view gbi (:selection model))
            (println "WOO" model)
-           (draw-tracker view gbi (:tracker model))
+           (draw-tracker view gbi model)
            (.drawImage g bi 0 0 nil)))))))
-
-
-(defn xform-roi [roi ^Component component ^BufferedImage video-frame]
-  (if (and component video-frame)
-    (let [cw (.getWidth component)
-          ch (.getHeight component)
-          iw (.getWidth video-frame)
-          ih (.getHeight video-frame)
-          xf (/ iw cw)
-          yf (/ ih cw)
-          [[x1 y1] [x2 y2]] roi]
-      [[(int (* x1 xf)) (int (* y1 yf))] [(int (* x2 xf)) (int (* y2 yf))]])
-    roi))
 
 
 (defn mouse-controller
@@ -297,7 +313,8 @@
                     :tracker
                     (vision/start-tracker
                      (:video-frame m)
-                     (xform-roi roi (.getComponent e) (:video-frame m))))))
+                     (map (view-point-xformer (.getComponent e) (:video-frame m))
+                          roi)))))
              m)))
         :else nil))))
 
