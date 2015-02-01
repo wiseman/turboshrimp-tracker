@@ -340,6 +340,24 @@
     model))
 
 
+(defn fps-throttle [f max-fps]
+  (let [dirty (ref nil)
+        runner (agent nil)
+        period (/ 1000 max-fps)]
+    (fn []
+      (dosync
+       (when-not @dirty
+         (ref-set dirty true)
+         (send-off
+          runner
+          (fn [r]
+            (Thread/sleep period)
+            (apply f args)
+            (dosync
+             (ref-set dirty false))
+            r)))))))
+
+
 (defn -main [& args]
   (vision/init)
   (let [ui (make-ui)
