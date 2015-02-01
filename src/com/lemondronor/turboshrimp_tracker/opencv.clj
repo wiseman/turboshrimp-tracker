@@ -1,5 +1,5 @@
 (ns com.lemondronor.turboshrimp-tracker.opencv
-  (:import [java.awt.image BufferedImage]
+  (:import [java.awt.image BufferedImage DataBufferInt]
            [java.util ArrayList]
            [nu.pattern OpenCV]
            [org.opencv.core Core CvType Mat MatOfInt MatOfFloat MatOfPoint Point
@@ -38,8 +38,8 @@
 
 
 (defn img->mat [^BufferedImage img]
-  (let [mat (Mat. (.getHeight img) (.getWidth img) CvType/CV_8UC3)
-        pixels (.getData (.getDataBuffer (.getRaster img)))]
+  (let [^Mat mat (Mat. (.getHeight img) (.getWidth img) CvType/CV_8UC3)
+        pixels (.getData ^DataBufferInt (.getDataBuffer (.getRaster img)))]
     (.put mat 0 0 pixels)
     mat))
 
