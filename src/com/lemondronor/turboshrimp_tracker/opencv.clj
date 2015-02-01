@@ -1,4 +1,5 @@
 (ns com.lemondronor.turboshrimp-tracker.opencv
+  "Some simple wrappers around OpenCV functions."
   (:import [java.awt.image BufferedImage DataBufferInt]
            [java.util ArrayList]
            [nu.pattern OpenCV]
@@ -12,7 +13,11 @@
 (set! *warn-on-reflection* true)
 
 
-(defn init []
+(defn init
+  "Need to call this before using OpenCV.
+
+  Loads the native library we require."
+  []
   (OpenCV/loadShared))
 
 
@@ -44,7 +49,12 @@
     mat))
 
 
-(defn make-roi-hist [^BufferedImage img roi-bounds]
+(defn make-roi-hist
+  "Given an image and a ROI, returns a tracking histogram.
+
+  Converts the image to HSV and returns a color histogram that can be
+  used for meanshift or camshift tracking."
+  [^BufferedImage img roi-bounds]
   (let [^Rect roi-rect (bounds->rect roi-bounds)
         ^Mat frame (img->mat img)
         ^Mat hsv-roi (Mat.)
@@ -52,6 +62,8 @@
         ^Mat roi (Mat. frame roi-rect)
         ^Mat roi-hist (Mat.)]
     (Imgproc/cvtColor roi hsv-roi Imgproc/COLOR_BGR2HSV)
+    ;; Creates a mask that contains any hue, saturation between
+    ;; 10-255, value between 32-255.
     (Core/inRange
      hsv-roi
      (Scalar. 0.0 10.0 32.0)
@@ -68,12 +80,16 @@
     roi-hist))
 
 
-(defn start-tracker [^BufferedImage img roi]
+(defn start-tracker
+  "Given an image and a ROI, returns a new tracker."
+  [^BufferedImage img roi]
   {:roi roi
    :roi-hist (make-roi-hist img roi)})
 
 
-(defn update-tracker [tracker ^BufferedImage img]
+(defn update-tracker
+  "Updates a tracker with a new image."
+  [tracker ^BufferedImage img]
   (let [^Mat frame (img->mat img)
         ^Mat hsv (Mat.)
         ^Mat back-projection (Mat.)]
@@ -98,10 +114,6 @@
        tracker
        :roi (rect->bounds (.boundingRect rot-rect))
        :tracked (map point->coords points)))))
-
-
-(defn stop-tracker [tracker]
-  nil)
 
 
 (defn write [^BufferedImage img]

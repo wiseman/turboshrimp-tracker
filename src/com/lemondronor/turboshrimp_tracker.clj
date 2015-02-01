@@ -8,11 +8,13 @@
             [com.lemondronor.turboshrimp.xuggler :as video]
             [com.lemondronor.turboshrimp-tracker.opencv :as vision]
             [seesaw.core :as seesaw])
-  (:import [java.awt.event InputEvent KeyEvent MouseEvent]
+  (:import [ch.qos.logback.classic Level Logger]
+           [java.awt.event InputEvent KeyEvent MouseEvent]
            [java.awt Color Component Font Graphics Graphics2D]
            [java.awt.image BufferedImage]
            [java.net Socket]
-           [javax.swing JPanel])
+           [javax.swing JPanel]
+           [org.slf4j LoggerFactory])
   (:gen-class))
 
 
@@ -291,7 +293,7 @@
          model
          (fn [m]
            (-> m
-               (assoc :tracker (vision/stop-tracker (:tracker model)))
+               (assoc :tracker nil)
                (assoc :selection {:origin [(.getX e) (.getY e)]}))))
         ;; Resize selection on MOUSE_DRAGGED.
         (= id MouseEvent/MOUSE_DRAGGED)
@@ -341,24 +343,37 @@
 
 
 (defn fps-throttle [f max-fps]
-  (let [dirty (ref nil)
-        runner (agent nil)
+  (let [dirty (ref false)
+        latest-args (atom nil)
+        runner (agent
+                nil
+                :error-handler (fn [a e]
+                                 (println e))
+                :error-mode :continue)
         period (/ 1000 max-fps)]
-    (fn []
+    (fn [& args]
       (dosync
-       (when-not @dirty
-         (ref-set dirty true)
-         (send-off
-          runner
-          (fn [r]
-            (Thread/sleep period)
-            (apply f args)
-            (dosync
-             (ref-set dirty false))
-            r)))))))
+       (if @dirty
+         (swap! latest-args (constantly args))
+         (do
+           (ref-set dirty true)
+           (send-off
+            runner
+            (fn [r]
+              (Thread/sleep period)
+              (apply f @latest-args)
+              (dosync
+               (ref-set dirty false))
+              r))))))))
+
+
+(defn init-logging []
+  (doto (LoggerFactory/getLogger Logger/ROOT_LOGGER_NAME)
+    (.setLevel Level/INFO)))
 
 
 (defn -main [& args]
+  (init-logging)
   (vision/init)
   (let [ui (make-ui)
         drone (ar-drone/make-drone)
@@ -366,7 +381,7 @@
                      :video-frame nil
                      :navdata nil
                      :selection nil})
-        view (make-view ui)]
+        view (fps-throttle (make-view ui) 60)]
     (-> ui seesaw/pack! seesaw/show!)
     (seesaw/listen ui :key (key-controller model))
     (let [mc (mouse-controller model)
