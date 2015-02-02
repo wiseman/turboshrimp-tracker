@@ -206,15 +206,13 @@
 (defn draw-tracker
   "Draws the tracking box."
   [^JPanel view ^Graphics2D g model]
-  (if-let [tracked (:tracked (:tracker model))]
+  (when-let [tracked (:tracked (:tracker model))]
     (let [tracked (map (inv-view-point-xformer view (:video-frame model))
                        tracked)]
-      (println "DRAWING TRACKER" (:tracked (:tracker model)))
       (.setColor g Color/RED)
       (let [x (int-array (map first tracked))
             y (int-array (map second tracked))]
-        (.drawPolygon g x y 4)))
-    (println "SKIPPING TRACKER")))
+        (.drawPolygon g x y 4)))))
 
 
 (defn draw-frame
@@ -262,23 +260,21 @@
 (defn make-view [ui]
   (let [^JPanel view (seesaw/select ui [:#video])]
     (fn render-model [model]
-      (let [g (.getGraphics view)
-            bi (BufferedImage.
-                (.getWidth view)
-                (.getHeight view)
-                BufferedImage/TYPE_INT_ARGB)
-            gbi (.createGraphics bi)
-            video-frame (:video-frame model)]
-        (draw-hud view gbi (:drone model))
-        (when video-frame
-          (vision/write video-frame)
-          (seesaw/invoke-now
+      (seesaw/invoke-now
+       (let [g (.getGraphics view)
+             bi (BufferedImage.
+                 (.getWidth view)
+                 (.getHeight view)
+                 BufferedImage/TYPE_INT_ARGB)
+             gbi (.createGraphics bi)
+             video-frame (:video-frame model)]
+         (when video-frame
+           (vision/write video-frame)
            (draw-frame view gbi video-frame)
-           (draw-hud view gbi (:drone model))
            (draw-selection view gbi (:selection model))
-           (println "WOO" model)
-           (draw-tracker view gbi model)
-           (.drawImage g bi 0 0 nil)))))))
+           (draw-tracker view gbi model))
+         (draw-hud view gbi (:drone model))
+         (.drawImage g bi 0 0 nil))))))
 
 
 (defn mouse-controller
@@ -304,7 +300,6 @@
         (swap!
          model
          (fn [m]
-           (println "STARTING TRACKER model=" m)
            (if-let [cur (:cur (:selection m))]
              (let [[x1 y1] (:origin (:selection m))
                    [x2 y2] cur
@@ -335,9 +330,6 @@
     (let [m (assoc
              model :tracker
              (vision/update-tracker tracker (:video-frame model)))]
-      (println "UPDATED TRACKER" (:tracker m))
-      (println (-> m :tracker :roi))
-      (println (-> m :tracker :tracked))
       m)
     model))
 
@@ -348,6 +340,7 @@
         runner (agent
                 nil
                 :error-handler (fn [a e]
+                                 (log/error e)
                                  (println e))
                 :error-mode :continue)
         period (/ 1000 max-fps)]
@@ -379,18 +372,30 @@
         drone (ar-drone/make-drone)
         model (atom {:drone drone
                      :video-frame nil
-                     :navdata nil
                      :selection nil})
-        view (fps-throttle (make-view ui) 60)]
+        ;;view (fps-throttle (make-view ui) 30)
+        view (make-view ui)
+        ]
     (-> ui seesaw/pack! seesaw/show!)
     (seesaw/listen ui :key (key-controller model))
     (let [mc (mouse-controller model)
           vid (seesaw/select ui [:#video])]
       (seesaw/listen vid :mouse mc)
       (seesaw/listen vid :mouse-motion mc))
-    (add-watch model :render-view (fn [k r o n] (view n)))
+    (doto (Thread.
+           (fn []
+             (try
+               (loop []
+                 (view @model)
+                 (Thread/sleep 100)
+                 (recur))
+               (catch Throwable e
+                 (log/error "Error in rendering thread" e)))))
+      (.start))
+    ;;(add-watch model :render-view (fn [k r o n] (view n)))
     (add-sub-watch
      model [:video-frame] :tracker (fn [k r o n] (swap! r update-tracker)))
     (start-video-controller model)
     (ar-drone/connect! drone)
-    (ar-drone/command drone :navdata-options commands/default-navdata-options)))
+    (ar-drone/command drone :navdata-options commands/default-navdata-options)
+    (log/info "INIT COMPLETE")))
