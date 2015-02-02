@@ -1,36 +1,17 @@
 # turboshrimp-tracker
 
-FIXME: description
-
-## Installation
-
-Download from http://example.com/FIXME.
+Ground control station for the AR.Drone with tracking, written in Clojure.
 
 ## Usage
 
-FIXME: explanation
+[Install lein](https://github.com/technomancy/leiningen#installation),
+then connect to the AR.Drone's network, then run
 
-    $ java -jar turboshrimp-tracker-0.1.0-standalone.jar [args]
-
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
+```
+$ lein run -m com.lemondronor.turboshrimp-tracker
 
 ## License
 
-Copyright © 2015 FIXME
+Copyright © 2015 John Wiseman
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+Distributed under the MIT License.
