@@ -163,6 +163,12 @@
         (.rotate g (deg2rad roll) (/ w 2.0) h2)))))
 
 
+(defn normalize-bb [[[x y] [w h]]]
+  (if (or (neg? w) (neg? h))
+    [[(+ x w) (+ y h)] [(- w) (- h)]]
+    [[x y] [w h]]))
+
+
 (defn draw-selection
   "Draws a selection marquee on the view."
   [^JPanel view ^Graphics2D g selection]
@@ -170,9 +176,10 @@
     (let [[x1 y1] (:origin selection)
           [x2 y2] (:cur selection)
           w (- x2 x1)
-          h (- y2 y1)]
+          h (- y2 y1)
+          [[x y] [w h]] (normalize-bb [[x1 y1] [w h]])]
       (.setColor g Color/WHITE)
-      (.drawRect g x1 y1 w h))))
+      (.drawRect g x y w h))))
 
 
 (defn view-point-xformer [^Component component ^BufferedImage video-frame]
@@ -299,7 +306,7 @@
           (when-let [cur (:cur (:selection m))]
             (let [[x1 y1] (:origin (:selection m))
                   [x2 y2] cur
-                  roi [[x1 y1] [(- x2 x1) (- y2 y1)]]
+                  roi (normalize-bb [[x1 y1] [(- x2 x1) (- y2 y1)]])
                   tracker (vision/start-tracker
                            (:video-frame m)
                            (map (view-point-xformer
