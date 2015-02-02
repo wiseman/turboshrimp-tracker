@@ -259,22 +259,20 @@
 
 (defn make-view [ui]
   (let [^JPanel view (seesaw/select ui [:#video])]
-    (fn render-model [model]
-      (seesaw/invoke-now
-       (let [g (.getGraphics view)
-             bi (BufferedImage.
-                 (.getWidth view)
-                 (.getHeight view)
-                 BufferedImage/TYPE_INT_ARGB)
-             gbi (.createGraphics bi)
-             video-frame (:video-frame model)]
-         (when video-frame
-           (vision/write video-frame)
-           (draw-frame view gbi video-frame)
-           (draw-selection view gbi (:selection model))
-           (draw-tracker view gbi model))
-         (draw-hud view gbi (:drone model))
-         (.drawImage g bi 0 0 nil))))))
+    (fn render-model [model c g]
+      (let [bi (BufferedImage.
+                (.getWidth view)
+                (.getHeight view)
+                BufferedImage/TYPE_INT_ARGB)
+            gbi (.createGraphics bi)
+            video-frame (:video-frame model)]
+        (when video-frame
+          (vision/write video-frame)
+          (draw-frame view gbi video-frame)
+          (draw-selection view gbi (:selection model))
+          (draw-tracker view gbi model))
+        (draw-hud view gbi (:drone model))
+        (.drawImage g bi 0 0 nil)))))
 
 
 (defn mouse-controller
@@ -381,17 +379,18 @@
     (let [mc (mouse-controller model)
           vid (seesaw/select ui [:#video])]
       (seesaw/listen vid :mouse mc)
-      (seesaw/listen vid :mouse-motion mc))
-    (doto (Thread.
-           (fn []
-             (try
-               (loop []
-                 (view @model)
-                 (Thread/sleep 100)
-                 (recur))
-               (catch Throwable e
-                 (log/error "Error in rendering thread" e)))))
-      (.start))
+      (seesaw/listen vid :mouse-motion mc)
+      (seesaw/config! vid :paint (fn [c g] (view @model c g)))
+      (doto (Thread.
+             (fn []
+               (try
+                 (loop []
+                   (seesaw/repaint! vid)
+                   (Thread/sleep 30)
+                   (recur))
+                 (catch Throwable e
+                   (log/error "Error in rendering thread" e)))))
+        (.start)))
     ;;(add-watch model :render-view (fn [k r o n] (view n)))
     (add-sub-watch
      model [:video-frame] :tracker (fn [k r o n] (swap! r update-tracker)))
