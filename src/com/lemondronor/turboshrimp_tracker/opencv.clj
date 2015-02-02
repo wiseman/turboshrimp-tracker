@@ -1,5 +1,6 @@
 (ns com.lemondronor.turboshrimp-tracker.opencv
   "Some simple wrappers around OpenCV functions."
+  (:require [seesaw.core :as seesaw])
   (:import [java.awt.image BufferedImage DataBufferByte]
            [java.util ArrayList]
            [nu.pattern OpenCV]
@@ -49,6 +50,31 @@
     mat))
 
 
+(defn mat->img [^Mat m]
+  (let [bufsiz (* (.channels m) (.cols m) (.rows m))
+        b (byte-array bufsiz)
+        img (BufferedImage.
+             (.cols m) (.rows m)
+             (if (> (.channels m) 1)
+               BufferedImage/TYPE_3BYTE_BGR
+               BufferedImage/TYPE_BYTE_GRAY))
+        target-pixels (.getData (.getDataBuffer (.getRaster img)))]
+    (.get m 0 0 b)
+    (System/arraycopy b 0 target-pixels 0 (count b))
+    img))
+
+
+(defn imshow [img]
+  (let [p (seesaw/frame
+           :title "Image"
+           :size [1280 :by 720]
+           :content
+           (seesaw/label
+            ;;:size [1280 :by 720]
+            :icon img))]
+    (-> p seesaw/pack! seesaw/show!)))
+
+
 (defn make-roi-hist
   "Given an image and a ROI, returns a tracking histogram.
 
@@ -69,6 +95,7 @@
      (Scalar. 0.0 10.0 32.0)
      (Scalar. 360.0 255.0 255.0)
      mask)
+    (imshow mask)
     (Imgproc/calcHist
      [hsv-roi]
      (mat-of-int 0)
