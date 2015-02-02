@@ -64,14 +64,14 @@
     img))
 
 
-(defn imshow [img]
+(defn imshow [m]
   (let [p (seesaw/frame
            :title "Image"
            :size [1280 :by 720]
            :content
            (seesaw/label
-            ;;:size [1280 :by 720]
-            :icon img))]
+            :size [1280 :by 720]
+            :icon (mat->img m)))]
     (-> p seesaw/pack! seesaw/show!)))
 
 
@@ -95,7 +95,6 @@
      (Scalar. 0.0 10.0 32.0)
      (Scalar. 360.0 255.0 255.0)
      mask)
-    (imshow mask)
     (Imgproc/calcHist
      [hsv-roi]
      (mat-of-int 0)

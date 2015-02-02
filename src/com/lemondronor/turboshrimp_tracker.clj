@@ -295,22 +295,22 @@
         ;; On MOUSE_RELEASED, initialize the video tracker and clear
         ;; the selection.
         (= id MouseEvent/MOUSE_RELEASED)
-        (swap!
-         model
-         (fn [m]
-           (if-let [cur (:cur (:selection m))]
-             (let [[x1 y1] (:origin (:selection m))
-                   [x2 y2] cur
-                   roi [[x1 y1] [(- x2 x1) (- y2 y1)]]]
-               (-> m
-                   (dissoc :selection)
-                   (assoc
-                    :tracker
-                    (vision/start-tracker
-                     (:video-frame m)
-                     (map (view-point-xformer (.getComponent e) (:video-frame m))
-                          roi)))))
-             m)))
+        (let [m @model]
+          (when-let [cur (:cur (:selection m))]
+            (let [[x1 y1] (:origin (:selection m))
+                  [x2 y2] cur
+                  roi [[x1 y1] [(- x2 x1) (- y2 y1)]]
+                  tracker (vision/start-tracker
+                           (:video-frame m)
+                           (map (view-point-xformer
+                                 (.getComponent e) (:video-frame m))
+                                roi))]
+              (swap!
+               model
+               (fn [m]
+                 (-> m
+                     (dissoc :selection)
+                     (assoc :tracker tracker)))))))
         :else nil))))
 
 
