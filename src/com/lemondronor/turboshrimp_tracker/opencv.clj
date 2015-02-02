@@ -1,6 +1,6 @@
 (ns com.lemondronor.turboshrimp-tracker.opencv
   "Some simple wrappers around OpenCV functions."
-  (:import [java.awt.image BufferedImage DataBufferInt]
+  (:import [java.awt.image BufferedImage DataBufferByte]
            [java.util ArrayList]
            [nu.pattern OpenCV]
            [org.opencv.core Core CvType Mat MatOfInt MatOfFloat MatOfPoint Point
@@ -44,7 +44,7 @@
 
 (defn img->mat [^BufferedImage img]
   (let [^Mat mat (Mat. (.getHeight img) (.getWidth img) CvType/CV_8UC3)
-        pixels (.getData ^DataBufferInt (.getDataBuffer (.getRaster img)))]
+        pixels (.getData ^DataBufferByte (.getDataBuffer (.getRaster img)))]
     (.put mat 0 0 pixels)
     mat))
 
@@ -109,7 +109,6 @@
             (+ TermCriteria/COUNT TermCriteria/EPS) 10 1.0))
           points (make-array Point 4)]
       (.points rot-rect points)
-      (println "WOO" rot-rect (.boundingRect rot-rect))
       (assoc
        tracker
        :roi (rect->bounds (.boundingRect rot-rect))
