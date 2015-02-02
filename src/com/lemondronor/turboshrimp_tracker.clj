@@ -213,13 +213,23 @@
 (defn draw-tracker
   "Draws the tracking box."
   [^JPanel view ^Graphics2D g model]
-  (when-let [tracked (:tracked (:tracker model))]
-    (let [tracked (map (inv-view-point-xformer view (:video-frame model))
-                       tracked)]
-      (.setColor g Color/RED)
-      (let [x (int-array (map first tracked))
-            y (int-array (map second tracked))]
-        (.drawPolygon g x y 4)))))
+  (let [tracker (:tracker model)
+        tracked (:tracked tracker)]
+    (if (and tracked
+             (not (= tracked '([0.0 0.0] [0.0 0.0] [0.0 0.0] [0.0 0.0]))))
+      (let [tracked (map (inv-view-point-xformer view (:video-frame model))
+                         tracked)]
+        (let [x (int-array (map first tracked))
+              y (int-array (map second tracked))]
+          (.setColor g Color/RED)
+          (.drawPolygon g x y 4))
+        (.setFont g (Font. "Futura" Font/PLAIN 24))
+        (.setColor g Color/WHITE)
+        (.drawString g "LOCKED" 10 690))
+      (when tracker
+        (.setFont g (Font. "Futura" Font/PLAIN 24))
+        (.setColor g Color/WHITE)
+        (.drawString g "LOST LOCK" 10 690)))))
 
 
 (defn draw-frame
@@ -398,7 +408,6 @@
                  (catch Throwable e
                    (log/error "Error in rendering thread" e)))))
         (.start)))
-    ;;(add-watch model :render-view (fn [k r o n] (view n)))
     (add-sub-watch
      model [:video-frame] :tracker (fn [k r o n] (swap! r update-tracker)))
     (start-video-controller model)

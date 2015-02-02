@@ -93,7 +93,7 @@
     (Core/inRange
      hsv-roi
      (Scalar. 0.0 10.0 32.0)
-     (Scalar. 360.0 255.0 255.0)
+     (Scalar. 360.0 255.0 250.0)
      mask)
     (Imgproc/calcHist
      [hsv-roi]
