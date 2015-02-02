@@ -9,6 +9,7 @@ then connect to the AR.Drone's network, then run
 
 ```
 $ lein run -m com.lemondronor.turboshrimp-tracker
+```
 
 ## License
 
