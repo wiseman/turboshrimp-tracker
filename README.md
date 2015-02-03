@@ -4,6 +4,8 @@ Ground control station for the AR.Drone with tracking, written in Clojure.
 
 ![Screenshot](/media/screenshots/turboshrimp-tracker.jpg?raw=true "Screenshot")
 
+You can watch a [video of the GCS in action](https://www.youtube.com/watch?v=cM88MxwChGs).
+
 
 ## Usage
 
